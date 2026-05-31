@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { extractResumeText, slugify, quickExtractProfile } from "@/lib/resumeParser";
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_RESUME_CHARS = 50000;
 
 const Index = () => {
   const navigate = useNavigate();
@@ -40,10 +41,12 @@ const Index = () => {
     try {
       const text = await extractResumeText(file);
       if (!text || text.length < 30) throw new Error("Could not read text from this file");
+      if (text.length > MAX_RESUME_CHARS) {
+        throw new Error("Resume text is too long. Please upload a shorter resume.");
+      }
       const extracted = quickExtractProfile(text);
-      const slug = slugify(name || file.name.replace(/\.[^.]+$/, ""));
-      const { error } = await supabase.from("profiles").insert({
-        slug,
+      const baseName = name || file.name.replace(/\.[^.]+$/, "");
+      const payload = {
         name: name || null,
         title: title || null,
         email: email || null,
@@ -53,8 +56,8 @@ const Index = () => {
         resume_text: text,
         extracted_summary: extracted.summary,
         skills: extracted.skills,
-      });
-      if (error) throw error;
+      };
+      const slug = await createProfileWithUniqueSlug(baseName, payload);
       const url = `${window.location.origin}/assistant/${slug}`;
       setShareSlug(slug);
       setShareUrl(url);
@@ -218,5 +221,33 @@ const Index = () => {
     </div>
   );
 };
+
+async function createProfileWithUniqueSlug(
+  baseName: string,
+  payload: {
+    name: string | null;
+    title: string | null;
+    email: string | null;
+    linkedin: string | null;
+    github: string | null;
+    portfolio_url: string | null;
+    resume_text: string;
+    extracted_summary: string;
+    skills: string[];
+  }
+) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const slug = slugify(baseName);
+    const { error } = await supabase.from("profiles").insert({
+      slug,
+      ...payload,
+    });
+
+    if (!error) return slug;
+    if (error.code !== "23505") throw error;
+  }
+
+  throw new Error("Could not create a unique assistant link. Please try again.");
+}
 
 export default Index;

@@ -67,7 +67,26 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          experience: Json | null
+          extracted_summary: string | null
+          github: string | null
+          id: string
+          linkedin: string | null
+          name: string | null
+          portfolio_url: string | null
+          projects: Json | null
+          skills: Json | null
+          slug: string
+          title: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

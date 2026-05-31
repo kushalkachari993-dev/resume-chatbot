@@ -19,7 +19,6 @@ type Profile = {
   linkedin: string | null;
   github: string | null;
   portfolio_url: string | null;
-  resume_text: string;
   extracted_summary: string | null;
   skills: string[] | null;
   projects: unknown[] | null;
@@ -49,7 +48,7 @@ const Assistant = () => {
     (async () => {
       if (!slug) return;
       const { data, error } = await supabase
-        .from("profiles")
+        .from("public_profiles")
         .select("*")
         .eq("slug", slug)
         .maybeSingle();
@@ -72,19 +71,7 @@ const Assistant = () => {
     try {
       const { data, error } = await supabase.functions.invoke("chat-assistant", {
         body: {
-          profile: {
-            name: profile.name,
-            title: profile.title,
-            email: profile.email,
-            linkedin: profile.linkedin,
-            github: profile.github,
-            portfolio_url: profile.portfolio_url,
-            extracted_summary: profile.extracted_summary,
-            skills: profile.skills,
-            projects: profile.projects,
-            experience: profile.experience,
-            resume_text: profile.resume_text,
-          },
+          slug: profile.slug,
           messages: next.map((m) => ({ role: m.role, content: m.content })),
         },
       });
@@ -92,14 +79,17 @@ const Assistant = () => {
       if ((data as any)?.error) throw new Error((data as any).error);
       setMessages((m) => [...m, { role: "assistant", content: (data as any).reply || "" }]);
     } catch (e: any) {
-      // Fallback: local response using resume text
-      const snippet = profile.resume_text.slice(0, 600);
+      const summary = profile.extracted_summary || "The AI service is temporarily unavailable.";
+      const skills =
+        profile.skills && profile.skills.length > 0
+          ? `\n\nVisible skills: ${profile.skills.slice(0, 12).join(", ")}.`
+          : "";
       setMessages((m) => [
         ...m,
         {
           role: "assistant",
           content:
-            `_(AI service unavailable - showing local fallback)_\n\nBased on the resume:\n\n${snippet}...`,
+            `_(AI service unavailable - showing public profile summary)_\n\n${summary}${skills}`,
         },
       ]);
       toast.error(e.message || "AI request failed");
