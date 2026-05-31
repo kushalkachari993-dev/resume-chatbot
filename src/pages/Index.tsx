@@ -12,6 +12,20 @@ import { extractResumeText, slugify, quickExtractProfile } from "@/lib/resumePar
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
 const MAX_RESUME_CHARS = 50000;
 
+type AiExtractedProfile = {
+  name: string | null;
+  title: string | null;
+  email: string | null;
+  linkedin: string | null;
+  github: string | null;
+  portfolio_url: string | null;
+  summary: string;
+  skills: string[];
+  projects: unknown[];
+  experience: unknown[];
+  education: unknown[];
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -44,18 +58,28 @@ const Index = () => {
       if (text.length > MAX_RESUME_CHARS) {
         throw new Error("Resume text is too long. Please upload a shorter resume.");
       }
-      const extracted = quickExtractProfile(text);
+      const extracted = await extractProfileWithAi(text, {
+        name,
+        title,
+        email,
+        linkedin,
+        github,
+        portfolio_url: portfolio,
+      });
       const baseName = name || file.name.replace(/\.[^.]+$/, "");
       const payload = {
-        name: name || null,
-        title: title || null,
-        email: email || null,
-        linkedin: linkedin || null,
-        github: github || null,
-        portfolio_url: portfolio || null,
+        name: name || extracted.name,
+        title: title || extracted.title,
+        email: email || extracted.email,
+        linkedin: linkedin || extracted.linkedin,
+        github: github || extracted.github,
+        portfolio_url: portfolio || extracted.portfolio_url,
         resume_text: text,
         extracted_summary: extracted.summary,
         skills: extracted.skills,
+        projects: extracted.projects,
+        experience: extracted.experience,
+        education: extracted.education,
       };
       const slug = await createProfileWithUniqueSlug(baseName, payload);
       const url = `${window.location.origin}/assistant/${slug}`;
@@ -234,6 +258,9 @@ async function createProfileWithUniqueSlug(
     resume_text: string;
     extracted_summary: string;
     skills: string[];
+    projects: unknown[];
+    experience: unknown[];
+    education: unknown[];
   }
 ) {
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -248,6 +275,99 @@ async function createProfileWithUniqueSlug(
   }
 
   throw new Error("Could not create a unique assistant link. Please try again.");
+}
+
+async function extractProfileWithAi(
+  resumeText: string,
+  hints: {
+    name: string;
+    title: string;
+    email: string;
+    linkedin: string;
+    github: string;
+    portfolio_url: string;
+  }
+): Promise<AiExtractedProfile> {
+  const fallback = quickExtractProfile(resumeText);
+
+  try {
+    const { data, error } = await supabase.functions.invoke("extract-resume", {
+      body: {
+        resume_text: resumeText,
+        hints,
+      },
+    });
+
+    if (error) throw new Error(await getFunctionErrorMessage(error));
+
+    const extracted = data as Partial<AiExtractedProfile>;
+    return {
+      name: cleanNullableString(extracted.name),
+      title: cleanNullableString(extracted.title),
+      email: cleanNullableString(extracted.email),
+      linkedin: cleanNullableString(extracted.linkedin),
+      github: cleanNullableString(extracted.github),
+      portfolio_url: cleanNullableString(extracted.portfolio_url),
+      summary: cleanString(extracted.summary) || fallback.summary,
+      skills: cleanStringArray(extracted.skills).length
+        ? cleanStringArray(extracted.skills)
+        : fallback.skills,
+      projects: Array.isArray(extracted.projects) ? extracted.projects : [],
+      experience: Array.isArray(extracted.experience) ? extracted.experience : [],
+      education: Array.isArray(extracted.education) ? extracted.education : [],
+    };
+  } catch (error: any) {
+    toast.warning("AI extraction was unavailable, so a basic parser was used.");
+    console.warn("AI extraction failed:", error?.message || error);
+    return {
+      name: null,
+      title: null,
+      email: null,
+      linkedin: null,
+      github: null,
+      portfolio_url: null,
+      summary: fallback.summary,
+      skills: fallback.skills,
+      projects: [],
+      experience: [],
+      education: [],
+    };
+  }
+}
+
+async function getFunctionErrorMessage(error: unknown) {
+  const fallback = error instanceof Error ? error.message : "AI extraction failed";
+  const response = (error as { context?: Response })?.context;
+
+  if (!response) return fallback;
+
+  try {
+    const body = await response.clone().json();
+    const detail =
+      typeof body?.detail === "string" && body.detail.trim()
+        ? `: ${body.detail}`
+        : "";
+    return body?.error ? `${body.error}${detail}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function cleanNullableString(value: unknown) {
+  const text = cleanString(value);
+  return text || null;
+}
+
+function cleanString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => cleanString(item))
+    .filter(Boolean)
+    .slice(0, 40);
 }
 
 export default Index;

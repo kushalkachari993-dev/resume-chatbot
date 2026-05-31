@@ -23,6 +23,7 @@ type Profile = {
   skills: string[] | null;
   projects: unknown[] | null;
   experience: unknown[] | null;
+  education: unknown[] | null;
 };
 
 type Msg = { role: "user" | "assistant"; content: string };

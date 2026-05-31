@@ -29,6 +29,7 @@ type Profile = {
   skills: unknown;
   projects: unknown;
   experience: unknown;
+  education: unknown;
   resume_text: string;
 };
 
@@ -222,6 +223,7 @@ async function fetchProfile(slug: string): Promise<Profile | null> {
     "skills",
     "projects",
     "experience",
+    "education",
     "resume_text",
   ].join(",");
 
@@ -280,6 +282,9 @@ ${JSON.stringify(profile.projects || [], null, 2)}
 
 Experience:
 ${JSON.stringify(profile.experience || [], null, 2)}
+
+Education:
+${JSON.stringify(profile.education || [], null, 2)}
 
 Resume Text:
 ${profile.resume_text || "No resume text provided"}

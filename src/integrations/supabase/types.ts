@@ -17,6 +17,7 @@ export type Database = {
       profiles: {
         Row: {
           created_at: string
+          education: Json | null
           email: string | null
           experience: Json | null
           extracted_summary: string | null
@@ -33,6 +34,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          education?: Json | null
           email?: string | null
           experience?: Json | null
           extracted_summary?: string | null
@@ -49,6 +51,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          education?: Json | null
           email?: string | null
           experience?: Json | null
           extracted_summary?: string | null
@@ -70,6 +73,7 @@ export type Database = {
       public_profiles: {
         Row: {
           created_at: string
+          education: Json | null
           email: string | null
           experience: Json | null
           extracted_summary: string | null
