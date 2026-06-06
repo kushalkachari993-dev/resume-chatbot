@@ -8,8 +8,8 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 30% 98%;
-    --foreground: 222 47% 11%;
+    --background: 210 25% 98%;
+    --foreground: 222 35% 10%;
 
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
@@ -17,33 +17,33 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 250 84% 60%;
+    --primary: 218 78% 46%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 270 90% 70%;
+    --primary-glow: 199 82% 55%;
 
-    --secondary: 220 14% 96%;
+    --secondary: 214 24% 94%;
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 214 24% 94%;
+    --muted-foreground: 217 11% 43%;
 
-    --accent: 250 84% 96%;
-    --accent-foreground: 250 84% 30%;
+    --accent: 166 52% 94%;
+    --accent-foreground: 166 78% 22%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 250 84% 60%;
+    --ring: 218 78% 46%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    --gradient-hero: linear-gradient(135deg, hsl(250 84% 60%) 0%, hsl(280 84% 65%) 50%, hsl(310 80% 65%) 100%);
-    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(220 30% 98%) 100%);
-    --gradient-mesh: radial-gradient(at 20% 20%, hsl(250 84% 60% / 0.15) 0px, transparent 50%), radial-gradient(at 80% 30%, hsl(310 80% 65% / 0.12) 0px, transparent 50%), radial-gradient(at 50% 80%, hsl(190 90% 60% / 0.1) 0px, transparent 50%);
-    --shadow-elegant: 0 20px 60px -20px hsl(250 84% 60% / 0.3);
-    --shadow-card: 0 4px 24px -4px hsl(222 47% 11% / 0.08);
+    --gradient-hero: linear-gradient(135deg, hsl(218 78% 46%) 0%, hsl(199 82% 42%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 25% 98%) 100%);
+    --gradient-mesh: linear-gradient(180deg, hsl(210 25% 98%) 0%, hsl(214 24% 96%) 100%);
+    --shadow-elegant: 0 18px 45px -28px hsl(222 35% 10% / 0.28);
+    --shadow-card: 0 8px 28px -20px hsl(222 35% 10% / 0.22);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;

@@ -3,13 +3,25 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Upload, Sparkles, Link2, MessageSquare, Copy, ExternalLink, FileText, Loader2 } from "lucide-react";
+import {
+  ArrowRight,
+  BrainCircuit,
+  CheckCircle2,
+  Copy,
+  Database,
+  FileText,
+  Link2,
+  Loader2,
+  MessageSquare,
+  ShieldCheck,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { extractResumeText, slugify, quickExtractProfile } from "@/lib/resumeParser";
 
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_BYTES = 5 * 1024 * 1024;
 const MAX_RESUME_CHARS = 50000;
 
 type AiExtractedProfile = {
@@ -25,6 +37,30 @@ type AiExtractedProfile = {
   experience: unknown[];
   education: unknown[];
 };
+
+const PROCESS_STEPS = [
+  {
+    icon: Upload,
+    title: "Parse resume",
+    desc: "PDF, DOCX, and TXT are converted into clean text.",
+  },
+  {
+    icon: BrainCircuit,
+    title: "Extract profile",
+    desc: "AI identifies skills, projects, experience, education, and links.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Publish assistant",
+    desc: "A shareable chat link answers from the resume only.",
+  },
+];
+
+const TRUST_NOTES = [
+  "The public page does not expose raw resume text.",
+  "The assistant fetches resume context server-side.",
+  "Manual fields override AI extraction when provided.",
+];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -58,6 +94,7 @@ const Index = () => {
       if (text.length > MAX_RESUME_CHARS) {
         throw new Error("Resume text is too long. Please upload a shorter resume.");
       }
+
       const extracted = await extractProfileWithAi(text, {
         name,
         title,
@@ -66,6 +103,7 @@ const Index = () => {
         github,
         portfolio_url: portfolio,
       });
+
       const baseName = name || file.name.replace(/\.[^.]+$/, "");
       const payload = {
         name: name || extracted.name,
@@ -81,11 +119,12 @@ const Index = () => {
         experience: extracted.experience,
         education: extracted.education,
       };
+
       const slug = await createProfileWithUniqueSlug(baseName, payload);
       const url = `${window.location.origin}/assistant/${slug}`;
       setShareSlug(slug);
       setShareUrl(url);
-      toast.success("Your AI assistant is ready!");
+      toast.success("Assistant link created");
     } catch (err: any) {
       toast.error(err.message || "Something went wrong");
     } finally {
@@ -96,101 +135,152 @@ const Index = () => {
   const copyLink = async () => {
     if (!shareUrl) return;
     await navigator.clipboard.writeText(shareUrl);
-    toast.success("Link copied to clipboard");
+    toast.success("Link copied");
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
-      <div className="absolute inset-0 -z-10 bg-gradient-mesh" />
-
-      {/* Header */}
-      <header className="container flex items-center justify-between py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-hero shadow-elegant">
-            <Sparkles className="h-5 w-5 text-primary-foreground" />
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="border-b bg-background/95">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold leading-none">ResumeLink AI</div>
+              <div className="mt-1 text-xs text-muted-foreground">Resume-grounded assistant builder</div>
+            </div>
           </div>
-          <span className="text-lg font-semibold tracking-tight">ResumeLink AI</span>
+          <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            Raw resume hidden from public pages
+          </div>
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="container pt-8 pb-12 text-center animate-fade-in">
-        <div className="mx-auto inline-flex items-center gap-2 rounded-full border bg-card/70 px-4 py-1.5 text-xs font-medium text-muted-foreground backdrop-blur">
-          <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
-          Your resume, now an AI assistant
-        </div>
-        <h1 className="mx-auto mt-6 max-w-3xl text-balance text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
-          Upload your resume.{" "}
-          <span className="bg-gradient-hero bg-clip-text text-transparent">
-            Generate a personal AI assistant link.
-          </span>
-        </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-          Share one link. Recruiters and collaborators chat with an AI that knows your background — answering only from your resume.
-        </p>
-
-        {/* Steps */}
-        <div className="mx-auto mt-10 grid max-w-3xl grid-cols-1 gap-4 md:grid-cols-3">
-          {[
-            { icon: Upload, title: "Upload Resume", desc: "PDF, DOCX, or TXT" },
-            { icon: Sparkles, title: "Generate AI Profile", desc: "We extract your story" },
-            { icon: Link2, title: "Share Link", desc: "Anyone can chat with it" },
-          ].map((s, i) => (
-            <div key={i} className="rounded-2xl border bg-card/60 p-5 text-left shadow-card backdrop-blur">
-              <s.icon className="h-5 w-5 text-primary" />
-              <div className="mt-3 text-sm font-semibold">{s.title}</div>
-              <div className="text-xs text-muted-foreground">{s.desc}</div>
+      <section className="mx-auto grid max-w-6xl gap-8 px-4 py-8 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-12">
+        <aside className="space-y-8">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              AI extraction included
             </div>
-          ))}
-        </div>
-      </section>
+            <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+              Turn a resume into a shareable interview assistant.
+            </h1>
+            <p className="mt-4 max-w-lg text-base leading-7 text-muted-foreground">
+              Upload a resume, review optional identity fields, and generate a public link recruiters can chat with.
+              The assistant answers from the resume context, not from generic guesses.
+            </p>
+          </div>
 
-      {/* Form / Success */}
-      <section className="container pb-24">
-        <Card className="mx-auto max-w-2xl border bg-gradient-card p-6 shadow-elegant md:p-8">
+          <div className="space-y-3">
+            {PROCESS_STEPS.map((step, index) => (
+              <div key={step.title} className="flex gap-3 rounded-lg border bg-card p-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+                  <step.icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <span className="text-muted-foreground">0{index + 1}</span>
+                    {step.title}
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-lg border bg-card p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+              <Database className="h-4 w-4 text-primary" />
+              Data handling
+            </div>
+            <div className="space-y-2">
+              {TRUST_NOTES.map((note) => (
+                <div key={note} className="flex gap-2 text-sm text-muted-foreground">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                  <span>{note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <section className="rounded-lg border bg-card shadow-card">
           {shareUrl ? (
-            <div className="space-y-5 text-center animate-fade-in">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-hero">
-                <Sparkles className="h-7 w-7 text-primary-foreground" />
+            <div className="p-6 sm:p-8">
+              <div className="flex items-start justify-between gap-4 border-b pb-6">
+                <div>
+                  <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Published
+                  </div>
+                  <h2 className="text-2xl font-semibold tracking-tight">Assistant link is ready</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Share this URL with recruiters, collaborators, or hiring teams.
+                  </p>
+                </div>
+                <div className="hidden h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground sm:flex">
+                  <Link2 className="h-5 w-5" />
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold">Your AI assistant is live</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Share this link with anyone — no login required.</p>
+
+              <div className="mt-6 rounded-lg border bg-background p-3">
+                <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Public link</div>
+                <div className="flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate text-sm">{shareUrl}</code>
+                  <Button size="sm" variant="outline" onClick={copyLink}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 rounded-xl border bg-background p-2">
-                <Link2 className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                <code className="flex-1 truncate text-left text-sm">{shareUrl}</code>
-                <Button size="sm" variant="secondary" onClick={copyLink}>
-                  <Copy className="mr-1.5 h-4 w-4" /> Copy
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <Button onClick={() => navigate(`/assistant/${shareSlug}`)}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Open assistant
                 </Button>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button className="flex-1" onClick={() => navigate(`/assistant/${shareSlug}`)}>
-                  <MessageSquare className="mr-2 h-4 w-4" /> Open Assistant
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={() => { setShareUrl(null); setFile(null); }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShareUrl(null);
+                    setFile(null);
+                  }}
+                >
                   Create another
                 </Button>
               </div>
             </div>
           ) : (
-            <form onSubmit={onSubmit} className="space-y-5">
-              <div>
+            <form onSubmit={onSubmit} className="p-6 sm:p-8">
+              <div className="border-b pb-6">
+                <h2 className="text-2xl font-semibold tracking-tight">Create assistant</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Start with the resume. The fields below are optional and override AI extraction when filled.
+                </p>
+              </div>
+
+              <div className="mt-6">
                 <Label>Resume file *</Label>
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="mt-1.5 flex w-full items-center gap-3 rounded-xl border-2 border-dashed bg-background/50 p-5 text-left transition-colors hover:border-primary hover:bg-accent/30"
+                  className="mt-2 flex min-h-28 w-full items-center gap-4 rounded-lg border border-dashed bg-background p-5 text-left transition-colors hover:border-primary hover:bg-secondary/50"
                 >
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                    <FileText className="h-5 w-5" />
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+                    <Upload className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">
-                      {file ? file.name : "Click to upload PDF, DOCX, or TXT"}
+                      {file ? file.name : "Upload PDF, DOCX, or TXT"}
                     </div>
-                    <div className="text-xs text-muted-foreground">Max 5MB</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Max 5MB. Text is extracted locally before AI structuring.
+                    </div>
                   </div>
+                  <ArrowRight className="hidden h-4 w-4 text-muted-foreground sm:block" />
                 </button>
                 <input
                   ref={fileRef}
@@ -201,50 +291,69 @@ const Index = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="name">Full name</Label>
-                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jane Doe" />
-                </div>
-                <div>
-                  <Label htmlFor="title">Role / title</Label>
-                  <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Senior GenAI Engineer" />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-                </div>
-                <div>
-                  <Label htmlFor="linkedin">LinkedIn</Label>
-                  <Input id="linkedin" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="linkedin.com/in/…" />
-                </div>
-                <div>
-                  <Label htmlFor="github">GitHub</Label>
-                  <Input id="github" value={github} onChange={(e) => setGithub(e.target.value)} placeholder="github.com/…" />
-                </div>
-                <div>
-                  <Label htmlFor="portfolio">Portfolio</Label>
-                  <Input id="portfolio" value={portfolio} onChange={(e) => setPortfolio(e.target.value)} placeholder="https://…" />
-                </div>
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <Field label="Full name" id="name" value={name} onChange={setName} placeholder="Jane Doe" />
+                <Field label="Role / title" id="title" value={title} onChange={setTitle} placeholder="Senior GenAI Engineer" />
+                <Field label="Email" id="email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
+                <Field label="LinkedIn" id="linkedin" value={linkedin} onChange={setLinkedin} placeholder="linkedin.com/in/..." />
+                <Field label="GitHub" id="github" value={github} onChange={setGithub} placeholder="github.com/..." />
+                <Field label="Portfolio" id="portfolio" value={portfolio} onChange={setPortfolio} placeholder="https://..." />
               </div>
 
-              <Button type="submit" size="lg" disabled={loading} className="w-full bg-gradient-hero text-primary-foreground hover:opacity-90">
+              <Button type="submit" size="lg" disabled={loading} className="mt-6 w-full">
                 {loading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating…</>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Extracting and publishing
+                  </>
                 ) : (
-                  <><Sparkles className="mr-2 h-4 w-4" /> Generate My AI Assistant</>
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate assistant link
+                  </>
                 )}
               </Button>
-              <p className="text-center text-xs text-muted-foreground">
-                Your resume text is stored to power your assistant. Share the link anywhere.
+
+              <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
+                Your resume is stored privately to power the assistant. Shared pages expose only public profile data.
               </p>
             </form>
           )}
-        </Card>
+        </section>
       </section>
-    </div>
+    </main>
   );
 };
+
+function Field({
+  label,
+  id,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: string;
+}) {
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-2"
+      />
+    </div>
+  );
+}
 
 async function createProfileWithUniqueSlug(
   baseName: string,
