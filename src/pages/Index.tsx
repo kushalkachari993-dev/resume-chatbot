@@ -3,9 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   ArrowRight,
+  BarChart3,
   BrainCircuit,
   CheckCircle2,
   Copy,
@@ -16,6 +18,7 @@ import {
   MessageSquare,
   ShieldCheck,
   Sparkles,
+  Target,
   Upload,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +39,18 @@ type AiExtractedProfile = {
   projects: unknown[];
   experience: unknown[];
   education: unknown[];
+};
+
+type JobFitAnalysis = {
+  score: number;
+  verdict: string;
+  matched_strengths: string[];
+  gaps: string[];
+  missing_keywords: string[];
+  resume_improvements: string[];
+  suggested_bullets: string[];
+  interview_questions: string[];
+  next_steps: string[];
 };
 
 const PROCESS_STEPS = [
@@ -73,7 +88,10 @@ const Index = () => {
   const [linkedin, setLinkedin] = useState("");
   const [github, setGithub] = useState("");
   const [portfolio, setPortfolio] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [fitAnalysis, setFitAnalysis] = useState<JobFitAnalysis | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
 
@@ -137,6 +155,39 @@ const Index = () => {
     if (!shareUrl) return;
     await navigator.clipboard.writeText(shareUrl);
     toast.success("Link copied");
+  };
+
+  const onAnalyzeFit = async () => {
+    if (!file) return toast.error("Please upload a resume file");
+    if (jobDescription.trim().length < 80) {
+      return toast.error("Paste a more complete job description first");
+    }
+
+    setAnalyzing(true);
+    setFitAnalysis(null);
+
+    try {
+      const text = await extractResumeText(file);
+      if (!text || text.length < 30) throw new Error("Could not read text from this file");
+      if (text.length > MAX_RESUME_CHARS) {
+        throw new Error("Resume text is too long. Please upload a shorter resume.");
+      }
+
+      const { data, error } = await supabase.functions.invoke("analyze-job-fit", {
+        body: {
+          resume_text: text,
+          job_description: jobDescription,
+        },
+      });
+
+      if (error) throw new Error(await getFunctionErrorMessage(error));
+      setFitAnalysis(normalizeJobFitAnalysis(data));
+      toast.success("Job-fit analysis ready");
+    } catch (err: any) {
+      toast.error(err.message || "Job-fit analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -301,6 +352,25 @@ const Index = () => {
                 <Field label="Portfolio" id="portfolio" value={portfolio} onChange={setPortfolio} placeholder="https://..." />
               </div>
 
+              <div className="mt-6">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <Label htmlFor="job-description">Job description</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Optional. Paste a role to compare against this resume.
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{jobDescription.length}/20000</span>
+                </div>
+                <Textarea
+                  id="job-description"
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value.slice(0, 20000))}
+                  placeholder="Paste the open job description here..."
+                  className="mt-2 min-h-36 resize-y"
+                />
+              </div>
+
               <Button type="submit" size="lg" disabled={loading} className="mt-6 w-full">
                 {loading ? (
                   <>
@@ -314,6 +384,29 @@ const Index = () => {
                   </>
                 )}
               </Button>
+
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                disabled={analyzing || loading}
+                onClick={onAnalyzeFit}
+                className="mt-3 w-full"
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing job fit
+                  </>
+                ) : (
+                  <>
+                    <Target className="mr-2 h-4 w-4" />
+                    Analyze fit with job description
+                  </>
+                )}
+              </Button>
+
+              {fitAnalysis && <JobFitReport analysis={fitAnalysis} />}
 
               <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
                 Your resume is stored privately to power the assistant. Shared links expire after 7 days.
@@ -352,6 +445,85 @@ function Field({
         placeholder={placeholder}
         className="mt-2"
       />
+    </div>
+  );
+}
+
+function JobFitReport({ analysis }: { analysis: JobFitAnalysis }) {
+  return (
+    <section className="mt-6 rounded-lg border bg-background p-4">
+      <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
+            <BarChart3 className="h-3.5 w-3.5" />
+            Job-fit analysis
+          </div>
+          <h3 className="text-xl font-semibold tracking-tight">{analysis.score}% match</h3>
+          {analysis.verdict && <p className="mt-2 text-sm leading-6 text-muted-foreground">{analysis.verdict}</p>}
+        </div>
+        <div className="h-2 w-full overflow-hidden rounded-full bg-secondary sm:mt-3 sm:w-40">
+          <div className="h-full rounded-full bg-primary" style={{ width: `${analysis.score}%` }} />
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <AnalysisList title="Strong matches" items={analysis.matched_strengths} />
+        <AnalysisList title="Gaps to close" items={analysis.gaps} />
+        <AnalysisList title="Missing keywords" items={analysis.missing_keywords} compact />
+        <AnalysisList title="Resume improvements" items={analysis.resume_improvements} />
+        <AnalysisList title="Suggested bullets" items={analysis.suggested_bullets} />
+        <AnalysisList title="Interview prep" items={analysis.interview_questions} />
+      </div>
+
+      {analysis.next_steps.length > 0 && (
+        <div className="mt-4 rounded-lg border bg-card p-4">
+          <h4 className="text-sm font-semibold">Next steps</h4>
+          <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
+            {analysis.next_steps.map((item, index) => (
+              <li key={`${item}-${index}`} className="flex gap-2">
+                <span className="font-medium text-foreground">{index + 1}.</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AnalysisList({
+  title,
+  items,
+  compact = false,
+}: {
+  title: string;
+  items: string[];
+  compact?: boolean;
+}) {
+  if (!items.length) return null;
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {compact ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {items.map((item, index) => (
+            <span key={`${item}-${index}`} className="rounded-md bg-secondary px-2 py-1 text-xs text-secondary-foreground">
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <ul className="mt-3 space-y-2 text-sm leading-6 text-muted-foreground">
+          {items.map((item, index) => (
+            <li key={`${item}-${index}`} className="flex gap-2">
+              <CheckCircle2 className="mt-1 h-3.5 w-3.5 shrink-0 text-primary" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -478,6 +650,31 @@ function cleanStringArray(value: unknown) {
     .map((item) => cleanString(item))
     .filter(Boolean)
     .slice(0, 40);
+}
+
+function normalizeJobFitAnalysis(value: unknown): JobFitAnalysis {
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    score: normalizeScore(record.score),
+    verdict: cleanString(record.verdict),
+    matched_strengths: cleanStringArray(record.matched_strengths),
+    gaps: cleanStringArray(record.gaps),
+    missing_keywords: cleanStringArray(record.missing_keywords),
+    resume_improvements: cleanStringArray(record.resume_improvements),
+    suggested_bullets: cleanStringArray(record.suggested_bullets),
+    interview_questions: cleanStringArray(record.interview_questions),
+    next_steps: cleanStringArray(record.next_steps),
+  };
+}
+
+function normalizeScore(value: unknown) {
+  const score = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(score)) return 0;
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 export default Index;
