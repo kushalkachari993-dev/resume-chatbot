@@ -59,6 +59,7 @@ const PROCESS_STEPS = [
 const TRUST_NOTES = [
   "The public page does not expose raw resume text.",
   "The assistant fetches resume context server-side.",
+  "Generated links stay active for 7 days.",
   "Manual fields override AI extraction when provided.",
 ];
 
@@ -151,9 +152,9 @@ const Index = () => {
               <div className="mt-1 text-xs text-muted-foreground">Resume-grounded assistant builder</div>
             </div>
           </div>
-          <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
+              <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            Raw resume hidden from public pages
+            Links expire after 7 days
           </div>
         </div>
       </header>
@@ -218,7 +219,7 @@ const Index = () => {
                   </div>
                   <h2 className="text-2xl font-semibold tracking-tight">Assistant link is ready</h2>
                   <p className="mt-2 text-sm text-muted-foreground">
-                    Share this URL with recruiters, collaborators, or hiring teams.
+                    Share this URL with recruiters, collaborators, or hiring teams. It will stay active for 7 days.
                   </p>
                 </div>
                 <div className="hidden h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground sm:flex">
@@ -315,7 +316,7 @@ const Index = () => {
               </Button>
 
               <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-                Your resume is stored privately to power the assistant. Shared pages expose only public profile data.
+                Your resume is stored privately to power the assistant. Shared links expire after 7 days.
               </p>
             </form>
           )}

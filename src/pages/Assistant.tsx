@@ -36,6 +36,7 @@ type Profile = {
   projects: unknown[] | null;
   experience: unknown[] | null;
   education: unknown[] | null;
+  expires_at: string;
 };
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -148,7 +149,7 @@ const Assistant = () => {
           </Link>
           <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
             <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            Answers are grounded in the uploaded resume
+            Link active until {formatDate(profile.expires_at)}
           </div>
           <Button asChild variant="outline" size="sm">
             <Link to="/">Create yours</Link>
@@ -374,6 +375,16 @@ function normalizeUrl(u: string) {
   if (!u) return "#";
   if (/^https?:\/\//i.test(u)) return u;
   return `https://${u}`;
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "expiry";
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 async function getFunctionErrorMessage(error: unknown) {

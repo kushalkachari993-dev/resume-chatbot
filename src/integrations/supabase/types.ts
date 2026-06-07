@@ -20,6 +20,7 @@ export type Database = {
           education: Json | null
           email: string | null
           experience: Json | null
+          expires_at: string
           extracted_summary: string | null
           github: string | null
           id: string
@@ -37,6 +38,7 @@ export type Database = {
           education?: Json | null
           email?: string | null
           experience?: Json | null
+          expires_at?: string
           extracted_summary?: string | null
           github?: string | null
           id?: string
@@ -54,6 +56,7 @@ export type Database = {
           education?: Json | null
           email?: string | null
           experience?: Json | null
+          expires_at?: string
           extracted_summary?: string | null
           github?: string | null
           id?: string
@@ -76,6 +79,7 @@ export type Database = {
           education: Json | null
           email: string | null
           experience: Json | null
+          expires_at: string
           extracted_summary: string | null
           github: string | null
           id: string

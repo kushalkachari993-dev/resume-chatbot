@@ -30,6 +30,7 @@ type Profile = {
   projects: unknown;
   experience: unknown;
   education: unknown;
+  expires_at: string;
   resume_text: string;
 };
 
@@ -81,6 +82,10 @@ Deno.serve(async (req) => {
 
     if (!profile) {
       return jsonResponse({ error: "Assistant profile not found" }, 404);
+    }
+
+    if (isExpired(profile.expires_at)) {
+      return jsonResponse({ error: "Assistant link has expired" }, 404);
     }
 
     const systemPrompt = buildSystemPrompt(profile);
@@ -224,6 +229,7 @@ async function fetchProfile(slug: string): Promise<Profile | null> {
     "projects",
     "experience",
     "education",
+    "expires_at",
     "resume_text",
   ].join(",");
 
@@ -289,4 +295,9 @@ ${JSON.stringify(profile.education || [], null, 2)}
 Resume Text:
 ${profile.resume_text || "No resume text provided"}
 `;
+}
+
+function isExpired(expiresAt: string) {
+  const date = new Date(expiresAt);
+  return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
 }
