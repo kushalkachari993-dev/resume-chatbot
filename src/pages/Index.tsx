@@ -10,6 +10,7 @@ import {
   BarChart3,
   BrainCircuit,
   CheckCircle2,
+  ClipboardCopy,
   Copy,
   Database,
   FileText,
@@ -53,6 +54,16 @@ type JobFitAnalysis = {
   next_steps: string[];
 };
 
+type TailoredResumeDraft = {
+  optimized_summary: string;
+  optimized_skills: string[];
+  optimized_experience_bullets: string[];
+  optimized_project_bullets: string[];
+  keywords_added: string[];
+  unsupported_gaps: string[];
+  warnings: string[];
+};
+
 const PROCESS_STEPS = [
   {
     icon: Upload,
@@ -89,9 +100,12 @@ const Index = () => {
   const [github, setGithub] = useState("");
   const [portfolio, setPortfolio] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [lastResumeText, setLastResumeText] = useState("");
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [tailoring, setTailoring] = useState(false);
   const [fitAnalysis, setFitAnalysis] = useState<JobFitAnalysis | null>(null);
+  const [tailoredDraft, setTailoredDraft] = useState<TailoredResumeDraft | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareSlug, setShareSlug] = useState<string | null>(null);
 
@@ -109,6 +123,7 @@ const Index = () => {
     setLoading(true);
     try {
       const text = await extractResumeText(file);
+      setLastResumeText(text);
       if (!text || text.length < 30) throw new Error("Could not read text from this file");
       if (text.length > MAX_RESUME_CHARS) {
         throw new Error("Resume text is too long. Please upload a shorter resume.");
@@ -165,9 +180,11 @@ const Index = () => {
 
     setAnalyzing(true);
     setFitAnalysis(null);
+    setTailoredDraft(null);
 
     try {
       const text = await extractResumeText(file);
+      setLastResumeText(text);
       if (!text || text.length < 30) throw new Error("Could not read text from this file");
       if (text.length > MAX_RESUME_CHARS) {
         throw new Error("Resume text is too long. Please upload a shorter resume.");
@@ -187,6 +204,38 @@ const Index = () => {
       toast.error(err.message || "Job-fit analysis failed");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const onTailorResume = async () => {
+    if (!fitAnalysis) return toast.error("Run job-fit analysis first");
+    if (!file && !lastResumeText) return toast.error("Please upload a resume file");
+    if (jobDescription.trim().length < 80) {
+      return toast.error("Paste a more complete job description first");
+    }
+
+    setTailoring(true);
+
+    try {
+      const text = lastResumeText || (file ? await extractResumeText(file) : "");
+      if (!text || text.length < 30) throw new Error("Could not read text from this file");
+      setLastResumeText(text);
+
+      const { data, error } = await supabase.functions.invoke("tailor-resume", {
+        body: {
+          resume_text: text,
+          job_description: jobDescription,
+          job_fit_analysis: fitAnalysis,
+        },
+      });
+
+      if (error) throw new Error(await getFunctionErrorMessage(error));
+      setTailoredDraft(normalizeTailoredDraft(data));
+      toast.success("Tailored draft ready");
+    } catch (err: any) {
+      toast.error(err.message || "Resume tailoring failed");
+    } finally {
+      setTailoring(false);
     }
   };
 
@@ -406,7 +455,14 @@ const Index = () => {
                 )}
               </Button>
 
-              {fitAnalysis && <JobFitReport analysis={fitAnalysis} />}
+              {fitAnalysis && (
+                <JobFitReport
+                  analysis={fitAnalysis}
+                  draft={tailoredDraft}
+                  tailoring={tailoring}
+                  onTailorResume={onTailorResume}
+                />
+              )}
 
               <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
                 Your resume is stored privately to power the assistant. Shared links expire after 7 days.
@@ -449,7 +505,17 @@ function Field({
   );
 }
 
-function JobFitReport({ analysis }: { analysis: JobFitAnalysis }) {
+function JobFitReport({
+  analysis,
+  draft,
+  tailoring,
+  onTailorResume,
+}: {
+  analysis: JobFitAnalysis;
+  draft: TailoredResumeDraft | null;
+  tailoring: boolean;
+  onTailorResume: () => void;
+}) {
   return (
     <section className="mt-6 rounded-lg border bg-background p-4">
       <div className="flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between">
@@ -488,7 +554,117 @@ function JobFitReport({ analysis }: { analysis: JobFitAnalysis }) {
           </ol>
         </div>
       )}
+
+      <div className="mt-4 rounded-lg border bg-card p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h4 className="text-sm font-semibold">Tailored resume draft</h4>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Rewrite copy-ready sections using only facts already supported by the resume.
+            </p>
+          </div>
+          <Button type="button" variant="outline" disabled={tailoring} onClick={onTailorResume}>
+            {tailoring ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Generating draft
+              </>
+            ) : (
+              <>
+                <ClipboardCopy className="mr-2 h-4 w-4" />
+                Generate tailored draft
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {draft && <TailoredDraftReport draft={draft} />}
     </section>
+  );
+}
+
+function TailoredDraftReport({ draft }: { draft: TailoredResumeDraft }) {
+  return (
+    <section className="mt-4 space-y-4">
+      {draft.optimized_summary && (
+        <CopyableSection title="Optimized summary" content={draft.optimized_summary} />
+      )}
+      <CopyableList title="Optimized skills" items={draft.optimized_skills} inline />
+      <CopyableList title="Experience bullets" items={draft.optimized_experience_bullets} />
+      <CopyableList title="Project bullets" items={draft.optimized_project_bullets} />
+      <CopyableList title="Keywords added" items={draft.keywords_added} inline />
+      <CopyableList title="Unsupported gaps" items={draft.unsupported_gaps} />
+      <CopyableList title="Warnings" items={draft.warnings} />
+    </section>
+  );
+}
+
+function CopyableSection({ title, content }: { title: string; content: string }) {
+  if (!content) return null;
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold">{title}</h4>
+        <CopyButton text={content} />
+      </div>
+      <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{content}</p>
+    </div>
+  );
+}
+
+function CopyableList({
+  title,
+  items,
+  inline = false,
+}: {
+  title: string;
+  items: string[];
+  inline?: boolean;
+}) {
+  if (!items.length) return null;
+  const text = inline ? items.join(", ") : items.map((item) => `- ${item}`).join("\n");
+
+  return (
+    <div className="rounded-lg border bg-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold">{title}</h4>
+        <CopyButton text={text} />
+      </div>
+      {inline ? (
+        <div className="flex flex-wrap gap-1.5">
+          {items.map((item, index) => (
+            <span key={`${item}-${index}`} className="rounded-md bg-secondary px-2 py-1 text-xs text-secondary-foreground">
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <ul className="space-y-2 text-sm leading-6 text-muted-foreground">
+          {items.map((item, index) => (
+            <li key={`${item}-${index}`} className="flex gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const onCopy = async () => {
+    await navigator.clipboard.writeText(text);
+    toast.success("Section copied");
+  };
+
+  return (
+    <Button type="button" size="sm" variant="outline" onClick={onCopy}>
+      <Copy className="mr-2 h-4 w-4" />
+      Copy
+    </Button>
   );
 }
 
@@ -668,6 +844,23 @@ function normalizeJobFitAnalysis(value: unknown): JobFitAnalysis {
     suggested_bullets: cleanStringArray(record.suggested_bullets),
     interview_questions: cleanStringArray(record.interview_questions),
     next_steps: cleanStringArray(record.next_steps),
+  };
+}
+
+function normalizeTailoredDraft(value: unknown): TailoredResumeDraft {
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+
+  return {
+    optimized_summary: cleanString(record.optimized_summary),
+    optimized_skills: cleanStringArray(record.optimized_skills),
+    optimized_experience_bullets: cleanStringArray(record.optimized_experience_bullets),
+    optimized_project_bullets: cleanStringArray(record.optimized_project_bullets),
+    keywords_added: cleanStringArray(record.keywords_added),
+    unsupported_gaps: cleanStringArray(record.unsupported_gaps),
+    warnings: cleanStringArray(record.warnings),
   };
 }
 
